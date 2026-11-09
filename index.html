@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f2">
+  <title>Minhas tarefas</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #20251f;
+      background: #f5f6f2;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 64px 20px;
+      background:
+        radial-gradient(ellipse at 10% 0%, #e8f0df 0, transparent 34rem),
+        #f5f6f2;
+    }
+
+    main { width: min(100%, 620px); margin: 0 auto; }
+    .eyebrow { color: #668054; font-size: .75rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 10px 0 8px; font-size: clamp(2.2rem, 8vw, 3.4rem); letter-spacing: -.06em; line-height: 1; }
+    .intro { margin: 0 0 30px; color: #6d746a; line-height: 1.6; }
+
+    .card {
+      padding: clamp(20px, 5vw, 32px);
+      border: 1px solid #e6e9e1;
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 20px 60px #29321b0b;
+    }
+
+    form { display: flex; gap: 10px; }
+    input[type="text"] {
+      min-width: 0;
+      flex: 1;
+      padding: 14px 16px;
+      border: 1px solid #e0e4db;
+      border-radius: 12px;
+      color: inherit;
+      font: inherit;
+    }
+
+    input:focus-visible, button:focus-visible {
+      outline: 3px solid #b8d5a5;
+      outline-offset: 2px;
+    }
+
+    button { font: inherit; cursor: pointer; }
+    .add-button {
+      padding: 0 18px;
+      border: 0;
+      border-radius: 12px;
+      background: #456b37;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 26px 0 14px; }
+    .filters { display: flex; gap: 6px; }
+    .filter {
+      padding: 7px 11px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: #73796e;
+      font-size: .88rem;
+    }
+    .filter[aria-pressed="true"] { background: #edf3e8; color: #456b37; font-weight: 700; }
+    .clear-button { padding: 7px 0; border: 0; background: transparent; color: #73796e; font-size: .84rem; }
+    .clear-button:hover, .filter:hover { color: #304c27; }
+
+    ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .task {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid #eef0ea;
+      border-radius: 12px;
+    }
+    .task input { width: 18px; height: 18px; accent-color: #456b37; }
+    .task-label { flex: 1; overflow-wrap: anywhere; }
+    .task.is-complete .task-label { color: #92988d; text-decoration: line-through; }
+    .delete-button { padding: 4px 8px; border: 0; background: transparent; color: #a0a59d; font-size: 1.1rem; }
+    .delete-button:hover { color: #a33b37; }
+    .empty { padding: 30px 12px; color: #858b81; text-align: center; }
+    .summary { margin: 18px 0 0; color: #858b81; font-size: .85rem; text-align: center; }
+
+    @media (max-width: 440px) {
+      body { padding: 40px 16px; }
+      form { flex-direction: column; }
+      .add-button { min-height: 46px; }
+      .toolbar { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Organize com leveza</p>
+    <h1>Minhas tarefas</h1>
+    <p class="intro">Um passo de cada vez. O que você quer tirar da cabeça hoje?</p>
+
+    <section class="card" aria-label="Lista de tarefas">
+      <form id="task-form">
+        <label for="task-input" class="visually-hidden">Nova tarefa</label>
+        <input id="task-input" type="text" maxlength="100" placeholder="Ex.: estudar JavaScript" autocomplete="off" required>
+        <button class="add-button" type="submit">Adicionar</button>
+      </form>
+
+      <div class="toolbar">
+        <div class="filters" aria-label="Filtrar tarefas">
+          <button class="filter" type="button" data-filter="all" aria-pressed="true">Todas</button>
+          <button class="filter" type="button" data-filter="active" aria-pressed="false">Pendentes</button>
+          <button class="filter" type="button" data-filter="completed" aria-pressed="false">Concluídas</button>
+        </div>
+        <button id="clear-completed" class="clear-button" type="button">Limpar concluídas</button>
+      </div>
+
+      <ul id="task-list" aria-live="polite"></ul>
+      <p id="summary" class="summary"></p>
+    </section>
+  </main>
+
+  <style>
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+  <script>
+    const storageKey = "minhas-tarefas-v1";
+    const form = document.querySelector("#task-form");
+    const input = document.querySelector("#task-input");
+    const list = document.querySelector("#task-list");
+    const summary = document.querySelector("#summary");
+    const filterButtons = document.querySelectorAll("[data-filter]");
+    let activeFilter = "all";
+    let tasks = JSON.parse(localStorage.getItem(storageKey) || "[]");
+
+    function saveTasks() {
+      localStorage.setItem(storageKey, JSON.stringify(tasks));
+    }
+
+    function renderTasks() {
+      const visibleTasks = tasks.filter((task) => {
+        if (activeFilter === "active") return !task.completed;
+        if (activeFilter === "completed") return task.completed;
+        return true;
+      });
+
+      list.replaceChildren();
+      if (visibleTasks.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "empty";
+        empty.textContent = tasks.length === 0 ? "Sua lista está livre. Adicione a primeira tarefa!" : "Nenhuma tarefa por aqui.";
+        list.append(empty);
+      }
+
+      visibleTasks.forEach((task) => {
+        const item = document.createElement("li");
+        item.className = `task${task.completed ? " is-complete" : ""}`;
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = task.completed;
+        checkbox.setAttribute("aria-label", `Marcar "${task.text}" como ${task.completed ? "pendente" : "concluída"}`);
+        checkbox.addEventListener("change", () => {
+          task.completed = checkbox.checked;
+          saveTasks();
+          renderTasks();
+        });
+
+        const label = document.createElement("span");
+        label.className = "task-label";
+        label.textContent = task.text;
+
+        const removeButton = document.createElement("button");
+        removeButton.className = "delete-button";
+        removeButton.type = "button";
+        removeButton.textContent = "×";
+        removeButton.setAttribute("aria-label", `Excluir "${task.text}"`);
+        removeButton.addEventListener("click", () => {
+          tasks = tasks.filter((currentTask) => currentTask.id !== task.id);
+          saveTasks();
+          renderTasks();
+        });
+
+        item.append(checkbox, label, removeButton);
+        list.append(item);
+      });
+
+      const pendingCount = tasks.filter((task) => !task.completed).length;
+      summary.textContent = `${pendingCount} ${pendingCount === 1 ? "tarefa pendente" : "tarefas pendentes"}`;
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      tasks.unshift({ id: crypto.randomUUID(), text, completed: false });
+      saveTasks();
+      input.value = "";
+      input.focus();
+      renderTasks();
+    });
+
+    filterButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        activeFilter = button.dataset.filter;
+        filterButtons.forEach((filterButton) => {
+          filterButton.setAttribute("aria-pressed", String(filterButton === button));
+        });
+        renderTasks();
+      });
+    });
+
+    document.querySelector("#clear-completed").addEventListener("click", () => {
+      tasks = tasks.filter((task) => !task.completed);
+      saveTasks();
+      renderTasks();
+    });
+
+    renderTasks();
+  </script>
+</body>
+</html>
